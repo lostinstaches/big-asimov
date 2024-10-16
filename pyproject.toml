@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "big-asimov"
+version = "0.1.0"
+description = ""
+authors = ["lostinstaches <igor@krnl.ai>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "1.26.4"
+requests = "^2.32.3"
+google-auth = "^2.34.0"
+firebase-admin = "^6.5.0"
+pillow = "^11.0.0"
+pandas = "^2.2.3"
+matplotlib = "^3.9.2"
+torch = "2.2.0"
+clip = {git = "https://github.com/openai/CLIP.git"}
+onnxruntime = "^1.19.2"
+insightface = "^0.7.3"
+torchvision = "0.17.0"
+transformers = "^4.45.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
