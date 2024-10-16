@@ -1,6 +1,7 @@
 import os
 from big_asimov.models.noise_model import NoiseModel
 from big_asimov.models.pixelate_model import PixelateModel
+from big_asimov.models.hard_noise_model import HardNoiseModel
 
 class ModelInfrastructure:
     def __init__(self, models, input_dir, output_dir):

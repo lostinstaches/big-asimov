@@ -1,11 +1,16 @@
 from infrastructure_module.infrastructure import ModelInfrastructure
 from models.noise_model import NoiseModel
+from models.hard_noise_model import HardNoiseModel
 from models.pixelate_model import PixelateModel
 from evaluation_module.evaluation import EvaluationSystem
 
 if __name__ == "__main__":
     # Set up models and directories
-    models = [NoiseModel("model_noise"), PixelateModel("model_pixelate")]
+    models = [
+        NoiseModel("model_noise"),
+        PixelateModel("model_pixelate"),
+        HardNoiseModel("model_hard_noise")
+    ]
     input_dir = "data"
     output_dir = "processed_images"
 
