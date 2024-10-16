@@ -1,4 +1,9 @@
 import os
+from PIL import Image
+import torch
+from .metrics.clip_i_metric import CLIPIMetric
+from .metrics.dino_metric import DINOMetric
+import os
 import pandas as pd
 import random
 import matplotlib.pyplot as plt
@@ -10,6 +15,7 @@ import numpy as np
 import torchvision.transforms as T
 import torch.hub
 from tqdm import tqdm
+import time
 
 class EvaluationSystem:
     def __init__(self, models, input_dir, output_dir):
@@ -17,13 +23,10 @@ class EvaluationSystem:
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=self.device)
-        self.dino_model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16').to(self.device)
-        self.dino_feature_extractor = T.Compose([
-            T.Resize((224, 224)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
+        self.metrics = [
+            CLIPIMetric(device=self.device),
+            DINOMetric(device=self.device)
+        ]
 
     def start_evaluation(self):
         evaluation_results = []
@@ -32,41 +35,35 @@ class EvaluationSystem:
             scores = self.evaluate_model(model)
             evaluation_results.append({
                 'model_id': model.model_id,
-                'clip_i': float(scores['clip_i']),
-                'dino': float(scores['dino'])
+                **scores
             })
 
-        self.visualize_results(evaluation_results, ['clip_i', 'dino'])
+        self.visualize_results(evaluation_results)
 
     def evaluate_model(self, model):
         model_output_dir = os.path.join(self.output_dir, model.model_id)
-        total_clip_i_score = 0
-        total_dino_score = 0
+        scores = {metric.__class__.__name__: 0 for metric in self.metrics}
         image_count = 0
 
-        for image_name in tqdm(os.listdir(model_output_dir), desc=f"Evaluating model {model.model_id}"):
+        for image_name in tqdm(os.listdir(model_output_dir), desc=f"Evaluation for model {model.model_id}"):
             input_image_path = os.path.join(self.input_dir, image_name)
             output_image_path = os.path.join(model_output_dir, image_name)
 
             if os.path.isfile(input_image_path) and os.path.isfile(output_image_path):
-                clip_i_score = self.clip_i_evaluation(input_image_path, output_image_path)
-                total_clip_i_score += clip_i_score
+                input_image = Image.open(input_image_path).convert('RGB')
+                output_image = Image.open(output_image_path).convert('RGB')
 
-                dino_score = self.dino_evaluation(input_image_path, output_image_path)
-                total_dino_score += dino_score
+                for metric in self.metrics:
+                    score = metric.evaluate(input_image, output_image)
+                    scores[metric.__class__.__name__] += score
+
                 image_count += 1
 
         if image_count > 0:
-            average_clip_i_score = total_clip_i_score / image_count
-            average_dino_score = total_dino_score / image_count
-        else:
-            average_clip_i_score = 0
-            average_dino_score = 0
+            for key in scores.keys():
+                scores[key] /= image_count
 
-        return {
-            'clip_i': average_clip_i_score,
-            'dino': average_dino_score
-        }
+        return scores
 
     def clip_i_evaluation(self, input_image_path, output_image_path):
         # Load and preprocess images
@@ -102,10 +99,10 @@ class EvaluationSystem:
         dino_score = torch.nn.functional.cosine_similarity(input_features, output_features, dim=-1).mean().item()
         return dino_score
 
-    def visualize_results(self, evaluation_results, metrics):
+    def visualize_results(self, evaluation_results):
         df = pd.DataFrame(evaluation_results)
         self.print_results(df)
-        self.plot_results(df, metrics)
+        self.plot_results(df, [metric.__class__.__name__ for metric in self.metrics])
 
     def print_results(self, df):
         # Print the evaluation results as a clean table
@@ -133,5 +130,9 @@ class EvaluationSystem:
                 if key[0] > 0 and key[1] == metrics.index(metric) + 1 and df.iloc[key[0] - 1][
                     f'highlight_{metric}'] == 'background-color: lightgreen':
                     cell.set_facecolor('lightgreen')
-        plt.savefig('evaluation_results_table.png', bbox_inches='tight', dpi=300)
+
+        if not os.path.exists('results'):
+            os.makedirs('results')
+        timestamp = time.strftime('%Y%m%d-%H%M%S')
+        plt.savefig(os.path.join('results', f'evaluation_results_{timestamp}.png'), bbox_inches='tight', dpi=300)
         plt.show()
